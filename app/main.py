@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.v1.routes import router as api_v1_router
 
 app = FastAPI(title="Multi-Agent Supplier RAG API")
 
@@ -9,3 +10,6 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+app.include_router(api_v1_router, prefix="/api/v1")
+

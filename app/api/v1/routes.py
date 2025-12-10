@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from app.schemas.upload import UploadRequest, UploadResponse
 from app.schemas.query import QueryRequest, QueryResponse, OfferEvaluation
+from app.schemas.version import VersionResponse
+from app.core.config import API_VERSION, API_NAME, API_DESCRIPTION
 
 router = APIRouter()
 
@@ -58,4 +60,15 @@ async def query_text(payload: QueryRequest):
             "evaluation agent based on retrieved offers and risk signals."
         ),
         offers_evaluated=offers,
+    )
+
+@router.get("/version", response_model=VersionResponse, tags=["meta"])
+def get_version() -> VersionResponse:
+    """
+    Return basic API version metadata
+    """
+    return VersionResponse(
+        version=API_VERSION,
+        name=API_NAME,
+        description=API_DESCRIPTION
     )

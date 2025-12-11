@@ -4,5 +4,5 @@ class UploadRequest(BaseModel):
     text: str
 
 class UploadResponse(BaseModel):
+    id: int
     message: str
-    length: int

@@ -1,6 +1,5 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from pgvector.sqlalchemy import register_vector
 
 from app.core.config import DATABASE_URL
 
@@ -13,7 +12,14 @@ engine = create_engine(
     future=True,
 )
 
-register_vector(engine)
+def init_db() -> None:
+    """
+    Initialize database-specific extensions and settings.
+
+    - Ensures the pgvector extension is available in the current database.
+    """
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
 SessionLocal = sessionmaker(
     bind=engine,

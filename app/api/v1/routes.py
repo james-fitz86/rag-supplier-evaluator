@@ -1,38 +1,51 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 from app.schemas.upload import UploadRequest, UploadResponse
 from app.schemas.query import QueryRequest, QueryResponse, OfferEvaluation
 from app.schemas.version import VersionResponse
 from app.core.config import API_VERSION, API_NAME, API_DESCRIPTION
+from app.core.db import get_db
+from app.services.ingestion_service import ingest_quotation
 
 router = APIRouter()
 
+
 @router.post("/upload", response_model=UploadResponse)
-async def upload_text(payload: UploadRequest):
+def upload_quotation(
+    payload: UploadRequest,
+    db: Session = Depends(get_db),
+) -> UploadResponse:
     """
-    Skeleton endpoint for querying supplier offers.
+    Ingest a raw supplier quotation.
+
+    Current behaviour:
+    - Generate a placeholder embedding
+    - Store quotation in the database
+    - Return the new quotation ID and a confirmation message
 
     Later:
-    - Retrieve embedded vectors from pgvector
-    - Pass supplier/product/question into multi-agent chain
-    - Return evaluated answer + justification
+    - Use ExtractorAgent to parse structured fields from the text
+    - Generate real embeddings from an embedding model
+    - Persist fully structured quotation + embedding
     """
-
-    text_length = len(payload.text)
+    quotation = ingest_quotation(payload.text, db)
 
     return UploadResponse(
-        message="Text received successfully. Processing not implemented yet",
-        length=text_length,
+        id=quotation.id,
+        message="Quotation ingested successfully",
     )
 
+
 @router.post("/query", response_model=QueryResponse)
-async def query_text(payload: QueryRequest):
+async def query_text(payload: QueryRequest) -> QueryResponse:
     """
     Skeleton endpoint for querying the system with a natural language request.
 
     Currently returns a static example response. Later, this will:
-    - run retrieval over stored quotations
-    - evaluate offers via multi-agent chain
-    - return a real recommendation and reasoning
+    - run retrieval over stored quotations using vector similarity
+    - evaluate offers via a multi-agent chain
+    - return a real recommendation and grounded reasoning
     """
 
     # TEMP: example-like static response just to prove the shape works
@@ -62,13 +75,14 @@ async def query_text(payload: QueryRequest):
         offers_evaluated=offers,
     )
 
+
 @router.get("/version", response_model=VersionResponse, tags=["meta"])
 def get_version() -> VersionResponse:
     """
-    Return basic API version metadata
+    Return basic API version metadata.
     """
     return VersionResponse(
         version=API_VERSION,
         name=API_NAME,
-        description=API_DESCRIPTION
+        description=API_DESCRIPTION,
     )

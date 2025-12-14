@@ -1,30 +1,34 @@
 from sqlalchemy.orm import Session
 
 from app.models.db_models import Quotation
-from app.core.embeddings import generate_embedding
+from app.core.embeddings import generate_embedding, EMBEDDING_DIM
+from app.agents.extractor_agent import extract_quotation
 
 
-def ingest_quotation(text: str, db: Session) -> Quotation:
+def ingest_quotation(text: str, db: Session, llm_client) -> Quotation:
     """
     Ingest a raw quotation text:
+    - extract structured fields using ExtractorAgent
     - generate an embedding
-    - (later) extract structured fields with an ExtractorAgent
     - store everything in the quotations table
     """
 
-    embedding = generate_embedding(text)
+    extracted = extract_quotation(llm_client, text)
 
-    # TODO  replace these placeholder values with real extraction
+    embedding = generate_embedding(text)
+    if len(embedding) != EMBEDDING_DIM:
+        raise ValueError(f"Embedding dim mismatch: got {len(embedding)} expected {EMBEDDING_DIM}")
+
     quotation = Quotation(
-        supplier_name="Unknown",
-        item_description=text[:2000],
-        unit_price=0.0,
-        currency="EUR",
-        min_quantity=1,
-        delivery_days=0,
-        payment_terms=None,
-        internal_note=None,
-        risk_assessment=None,
+        supplier_name=extracted.supplier_name,
+        item_description=extracted.item_description,
+        unit_price=extracted.unit_price,
+        currency=extracted.currency or "EUR",
+        min_quantity=extracted.min_quantity or 1,
+        delivery_days=extracted.delivery_days,
+        payment_terms=extracted.payment_terms,
+        internal_note=extracted.internal_note,
+        risk_assessment=extracted.risk_assessment,
         raw_text=text,
         embedding=embedding,
     )

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.schemas.upload import UploadRequest, UploadResponse
@@ -7,29 +7,34 @@ from app.schemas.version import VersionResponse
 from app.core.config import API_VERSION, API_NAME, API_DESCRIPTION
 from app.core.db import get_db
 from app.services.ingestion_service import ingest_quotation
+from app.core.llm_client import build_llm_client, LLMClientError
 
 router = APIRouter()
+
+
+def get_llm_client():
+    try:
+        return build_llm_client()
+    except LLMClientError as e:
+        raise HTTPException(status_code=501, detail=str(e))
 
 
 @router.post("/upload", response_model=UploadResponse)
 def upload_quotation(
     payload: UploadRequest,
     db: Session = Depends(get_db),
+    llm_client=Depends(get_llm_client),
 ) -> UploadResponse:
     """
     Ingest a raw supplier quotation.
 
-    Current behaviour:
-    - Generate a placeholder embedding
+    Behaviour:
+    - Extract structured fields via ExtractorAgent (requires configured LLM client)
+    - Generate an embedding vector
     - Store quotation in the database
     - Return the new quotation ID and a confirmation message
-
-    Later:
-    - Use ExtractorAgent to parse structured fields from the text
-    - Generate real embeddings from an embedding model
-    - Persist fully structured quotation + embedding
     """
-    quotation = ingest_quotation(payload.text, db)
+    quotation = ingest_quotation(payload.text, db, llm_client)
 
     return UploadResponse(
         id=quotation.id,
@@ -48,7 +53,6 @@ async def query_text(payload: QueryRequest) -> QueryResponse:
     - return a real recommendation and grounded reasoning
     """
 
-    # TEMP: example-like static response just to prove the shape works
     offers = [
         OfferEvaluation(
             supplier="QuickFix",

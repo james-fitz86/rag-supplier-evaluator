@@ -19,6 +19,15 @@ def get_llm_client():
     except LLMClientError as e:
         raise HTTPException(status_code=501, detail=str(e))
 
+def get_llm_client_optional():
+    """
+    Optional LLM dependency for routes that can run without an LLM.
+    Returns None if the LLM is not configured/available.
+    """
+    try:
+        return build_llm_client()
+    except LLMClientError:
+        return None
 
 @router.post("/upload", response_model=UploadResponse)
 def upload_quotation(
@@ -47,18 +56,19 @@ def upload_quotation(
 def query_text(
     payload: QueryRequest,
     db: Session = Depends(get_db),
+    llm_client=Depends(get_llm_client_optional),
 ) -> QueryResponse:
     """
     Query the system with a natural language request.
 
     Current behaviour:
     - Retrieve top-k quotations using vector similarity
-    - Return them in the expected response shape
+    - Evaluate retrieved offers (simple heuristic for now)
 
     Later:
-    - Run EvaluatorAgent to produce a grounded recommendation and reasoning
+    - Use llm_client (if available) to produce grounded recommendation + reasoning
     """
-    return run_query(payload.query, db=db, top_k=5)
+    return run_query(payload.query, db=db, top_k=5, llm_client=llm_client)
 
 
 @router.get("/version", response_model=VersionResponse, tags=["meta"])

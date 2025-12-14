@@ -2,14 +2,19 @@ from sqlalchemy.orm import Session
 
 from app.agents.retriever_agent import retrieve_quotations
 from app.schemas.query import QueryResponse, OfferEvaluation
+from app.services.evaluation_service import evaluate_retrieved_offers
 
 
-def run_query(text: str, db: Session, top_k: int = 5) -> QueryResponse:
+def run_query(text: str, db: Session, top_k: int = 5, llm_client=None) -> QueryResponse:
     """
-    Orchestrate the query workflow:
-    - retrieve relevant quotations from DB (vector similarity)
-    - map them into the response schema
-    - (later) call EvaluatorAgent to pick best supplier + grounded reasoning
+    Orchestrate the query workflow.
+
+    Steps:
+    - Generate an embedding for the query and retrieve the top-k most similar quotations (pgvector)
+    - Map retrieved quotations into OfferEvaluation objects
+    - Evaluate the offers to produce a recommendation and grounded reasoning
+      - If an LLM client is available, use it
+      - Otherwise fall back to a simple heuristic evaluator
     """
     retrieved = retrieve_quotations(query=text, db=db, top_k=top_k)
 
@@ -24,11 +29,10 @@ def run_query(text: str, db: Session, top_k: int = 5) -> QueryResponse:
         for q in retrieved
     ]
 
-    # Placeholder until EvaluatorAgent exists
-    recommendation = offers[0].supplier if offers else "No match"
-    reasoning = (
-        "Retrieved the most relevant offers from the database using vector similarity search. "
-        "Evaluation agent not implemented yet."
+    recommendation, reasoning = evaluate_retrieved_offers(
+        user_query=text,
+        offers=offers,
+        llm_client=llm_client,
     )
 
     return QueryResponse(

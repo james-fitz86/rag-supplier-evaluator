@@ -3,28 +3,7 @@ from __future__ import annotations
 from typing import Iterable, Tuple, Optional
 
 from app.agents.evaluator_llm import evaluate_with_llm
-
-
-def _heuristic_pick(offers_list: list[object]) -> Tuple[str, str]:
-    def sort_key(o: object) -> tuple:
-        price = getattr(o, "unit_price", None)
-        days = getattr(o, "delivery_days", None)
-
-        price_key = price if price is not None else float("inf")
-        days_key = days if days is not None else float("inf")
-        return (price_key, days_key)
-
-    best = sorted(offers_list, key=sort_key)[0]
-
-    supplier = getattr(best, "supplier", "Unknown")
-    price = getattr(best, "unit_price", None)
-    days = getattr(best, "delivery_days", None)
-
-    reasoning = (
-        "Selected the lowest unit price from the retrieved offers. "
-        f"Chosen supplier={supplier}, unit_price={price}, delivery_days={days}."
-    )
-    return supplier, reasoning
+from app.agents.evaluator_scoring import pick_best_offer
 
 
 def evaluate_offers(
@@ -33,9 +12,9 @@ def evaluate_offers(
     llm_client: Optional[object] = None,
 ) -> Tuple[str, str]:
     """
-    Evaluator (wired):
+    Evaluator:
     - If llm_client is available, use LLM-based evaluation (grounded on retrieved offers)
-    - Otherwise fall back to simple heuristic
+    - Otherwise fall back to deterministic scoring (constraint + risk + price + delivery)
     """
     offers_list = list(offers)
     if not offers_list:
@@ -45,7 +24,7 @@ def evaluate_offers(
         try:
             return evaluate_with_llm(user_query=user_query, offers=offers_list, llm_client=llm_client)
         except Exception:
-            # Guardrail: any LLM failure falls back to deterministic logic
-            return _heuristic_pick(offers_list)
+            # Any LLM failure -> deterministic fallback
+            return pick_best_offer(user_query=user_query, offers=offers_list)
 
-    return _heuristic_pick(offers_list)
+    return pick_best_offer(user_query=user_query, offers=offers_list)

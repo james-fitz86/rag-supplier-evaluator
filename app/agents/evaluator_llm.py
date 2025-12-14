@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Tuple, Set
 
+import json
 
 def evaluate_with_llm(
     user_query: str,
@@ -33,16 +34,23 @@ def evaluate_with_llm(
 
     system = (
         "You are an evaluation agent for supplier quotations. "
-        "You MUST use only the provided offers. "
-        "Do not invent details. "
+        "You MUST use only the provided offers. Do not invent details. "
+        "Keep reasoning brief and reference price and delivery when available. "
+        "If a required detail is missing from the offers, say it is unknown. "
         "Return a JSON object with keys: recommendation, reasoning."
     )
 
+    offers_json = json.dumps(payload, ensure_ascii=False)
+
     user = (
         f"User request:\n{user_query}\n\n"
-        f"Offers:\n{payload}\n\n"
-        "Choose the best supplier. "
-        "recommendation must exactly match one of the supplier names in the offers."
+        f"Offers (JSON):\n{offers_json}\n\n"
+        "Task:\n"
+        "1) Choose the best supplier for the request.\n"
+        "2) Base your decision only on the offers above.\n"
+        "Output rules:\n"
+        "- recommendation must exactly match one supplier string from the offers.\n"
+        "- reasoning must be 1–3 sentences and cite specific offer fields (price and/or delivery_days).\n"
     )
 
     # The OpenAIJsonClient already forces JSON and parses it for us.

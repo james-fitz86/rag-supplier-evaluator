@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.agents.retriever_agent import retrieve_quotations
 from app.schemas.query import QueryResponse, OfferEvaluation
 from app.services.evaluation_service import evaluate_retrieved_offers
+from app.agents.summarizer_agent import summarize_decision
 
 
 def run_query(text: str, db: Session, top_k: int = 5, llm_client=None) -> QueryResponse:
@@ -10,11 +11,10 @@ def run_query(text: str, db: Session, top_k: int = 5, llm_client=None) -> QueryR
     Orchestrate the query workflow.
 
     Steps:
-    - Generate an embedding for the query and retrieve the top-k most similar quotations (pgvector)
+    - Retrieve top-k most similar quotations (pgvector similarity search)
     - Map retrieved quotations into OfferEvaluation objects
-    - Evaluate the offers to produce a recommendation and grounded reasoning
-      - If an LLM client is available, use it
-      - Otherwise fall back to a simple heuristic evaluator
+    - Evaluate offers to produce recommendation + reasoning (LLM if available, fallback otherwise)
+    - Generate a brief summary and prepend it to the reasoning
     """
     retrieved = retrieve_quotations(query=text, db=db, top_k=top_k)
 
@@ -34,6 +34,16 @@ def run_query(text: str, db: Session, top_k: int = 5, llm_client=None) -> QueryR
         offers=offers,
         llm_client=llm_client,
     )
+
+    summary = summarize_decision(
+        user_query=text,
+        recommendation=recommendation,
+        offers=offers,
+        llm_client=llm_client,
+    )
+
+    if summary:
+        reasoning = f"{summary}\n\n{reasoning}"
 
     return QueryResponse(
         recommendation=recommendation,

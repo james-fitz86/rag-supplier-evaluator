@@ -240,4 +240,4 @@ This repository includes:
 - Example API usage via Swagger
 - Screenshots demonstrating system behaviour
 
-All components required to download, run, and test the system locally are included.
+All components required to download, run, and test the system locally are included here.
